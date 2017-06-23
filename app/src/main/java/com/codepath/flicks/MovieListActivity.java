@@ -2,9 +2,12 @@ package com.codepath.flicks;
 
 import android.os.Bundle;
 import android.support.v7.app.AppCompatActivity;
+import android.support.v7.widget.LinearLayoutManager;
+import android.support.v7.widget.RecyclerView;
 import android.util.Log;
 import android.widget.Toast;
 
+import com.codepath.flicks.models.Config;
 import com.codepath.flicks.models.Movie;
 import com.loopj.android.http.AsyncHttpClient;
 import com.loopj.android.http.JsonHttpResponseHandler;
@@ -30,12 +33,14 @@ public class MovieListActivity extends AppCompatActivity {
 
     // instance fields (only have values associated with a specific instance of movie list activity
     AsyncHttpClient client;
-    // the base url for loading images
-    String imageBaseUrl;
-    // the poster size to use when fetching images, part of the url
-    String posterSize;
     // the list of currently playing movies
     ArrayList<Movie> movies;
+    // the recycler view
+    RecyclerView rvMovies;
+    // the adapter wired to the recycler view
+    MovieAdapter adapter;
+    // image config
+    Config config;
 
 
     @Override
@@ -48,10 +53,16 @@ public class MovieListActivity extends AppCompatActivity {
         //initialize the list of movies
         movies = new ArrayList<>();
 
+        // initialize the adapter -- movies array cannot be reinitialized after this point
+        adapter = new MovieAdapter(movies);
+
+        // resolve the reference to the recycler view and connect a layout manager and the adapter
+        rvMovies = (RecyclerView) findViewById(R.id.rvMovies);
+        rvMovies.setLayoutManager (new LinearLayoutManager(this));
+        rvMovies.setAdapter(adapter);
+
         // get the configuration on app creation
         getConfiguration();
-
-
     }
 
     // get the list of currently playing movies from the API
@@ -78,6 +89,9 @@ public class MovieListActivity extends AppCompatActivity {
 
                         Movie movie = new Movie(results.getJSONObject(i));
                         movies.add(movie);
+
+                        // notify adapter that a row was added
+                        adapter.notifyItemInserted(movies.size() - 1);
                     }
 
                     // log that the operation was completed successfully
@@ -115,19 +129,15 @@ public class MovieListActivity extends AppCompatActivity {
 
                 try {
 
-                    JSONObject images = response.getJSONObject("images");
-
-                    // get the image base url
-                    imageBaseUrl = images.getString("secure_base_url");
-
-                    // get the poster size
-                    JSONArray posterSizeOptions = images.getJSONArray("poster_sizes");
-
-                    // use the option at index 3 or w342 as a fallback
-                    posterSize = posterSizeOptions.optString(3, "w342");
+                    config = new Config(response);
 
                     // Log that the operation was completed successfully
-                    Log.i(TAG, String.format("Loaded configuration with imageBaseUrl %s and posterSize %s", imageBaseUrl, posterSize));
+                    Log.i(TAG, String.format("Loaded configuration with imageBaseUrl %s and posterSize %s",
+                            config.getImageBaseUrl(),
+                            config.getPosterSize()));
+
+                    // pass config to adapter
+                    adapter.setConfig(config);
 
                     // get the now playing movie list
                     getNowPlaying();
